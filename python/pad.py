@@ -10,7 +10,8 @@ def build_address_string(row, street_numbers, no_street_number):
     stname = row['stname'].strip()
 
     if len(lhnd) == 0 and len(hhnd) == 0:
-        no_street_number.append(stname)
+        #no_street_number.append(stname)
+        no_street_number.append(" ".join(stname.split()))
     else:
         if lhnd == hhnd:
             street_numbers.append(lhnd)

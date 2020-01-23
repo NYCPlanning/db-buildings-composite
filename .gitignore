@@ -1,3 +1,4 @@
 input/
 output/
 python/pad_old.py
+.env
