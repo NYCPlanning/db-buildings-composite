@@ -35,7 +35,12 @@ if __name__ == '__main__':
         ORDER BY boro, block, lot, bin, stname, lhnd;'''
 
     df = pd.read_sql(import_sql, recipe_engine)
-    print(df.head())
+
+    if df.empty:
+        print('No records on PAD table read')
+        exit()
+    else:
+        print(df.head())
 
     # Initialize work areas
 
@@ -51,7 +56,7 @@ if __name__ == '__main__':
     c2 = '::'
     input_ctr = 0
     output_ctr = 0
-    bin_ctr = 0
+    bin_ctr = 1
 
     # Open the output CSV, loop through the data and roll up addresses for each BIN
 
@@ -71,7 +76,8 @@ if __name__ == '__main__':
                 if len(street_numbers) > 0:
                     if bin_ctr == 1:
                         stname_hold = '({})'.format(stname_hold.strip())
-                    addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                    #addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                    addresses.append(c1.join(sorted(street_numbers)) + " " + " ".join(stname_hold.split()))
 
                 if len(addresses) == 0 and len(no_street_number) == 1:
                     no_street_number[0] = '({})'.format(no_street_number[0])
@@ -106,7 +112,8 @@ if __name__ == '__main__':
                 if row['stname'] != stname_hold:
 
                     if len(street_numbers) > 0:
-                        addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                        #addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                        addresses.append(c1.join(sorted(street_numbers)) + " " + " ".join(stname_hold.split()))
                         street_numbers = []
 
                     stname_hold = row['stname']
@@ -119,7 +126,8 @@ if __name__ == '__main__':
         if len(street_numbers) > 0:
             if bin_ctr == 1:
                 stname_hold = '({})'.format(stname_hold.strip())
-                addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                #addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                addresses.append(c1.join(sorted(street_numbers)) + " " + " ".join(stname_hold.split()))
 
         street_string = c2.join([*addresses, *no_street_number])
 
