@@ -32,8 +32,7 @@ if __name__ == '__main__':
     import_sql = '''SELECT boro, block, lot, bin, lhnd, hhnd, stname
         FROM dcp_pad.latest
         WHERE bin NOT IN ('1000000', '2000000', '3000000', '4000000', '5000000')
-        ORDER BY boro, block, lot, bin, stname, lhnd
-        LIMIT 3000;'''
+        ORDER BY boro, block, lot, bin, stname, lhnd;'''
 
     df = pd.read_sql(import_sql, recipe_engine)
     print(df.head())
@@ -53,92 +52,79 @@ if __name__ == '__main__':
     input_ctr = 0
     output_ctr = 0
     bin_ctr = 0
-    df_output = pd.DataFrame(columns=['boro', 'block', 'lot', 'bin', 'address_string'])
 
-    # Loop through data and roll up addresses for each BIN
+    # Open the output CSV, loop through the data and roll up addresses for each BIN
 
-    for index, row in df.iterrows():
-        input_ctr += 1
-        if input_ctr % 10000 == 0:
-            print('Records processed {}'.format(input_ctr))
+    with open('output/pad_output.csv', mode='w') as pad_output:
+        pad_output_writer = csv.writer(pad_output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
-        if row['bin'] != bin_hold:
+        for index, row in df.iterrows():
+
+            input_ctr += 1
+            if input_ctr % 10000 == 0:
+                print('Records processed {}'.format(input_ctr))
+
+            if row['bin'] != bin_hold:
 
             # Write the record for the last BIN to the output dataframe
 
-            if len(street_numbers) > 0:
-                if bin_ctr == 1:
-                    stname_hold = '({})'.format(stname_hold.strip())
-                addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
-
-            if len(addresses) == 0 and len(no_street_number) == 1:
-                no_street_number[0] = '({})'.format(no_street_number[0])
-
-            street_string = c2.join([*addresses, *no_street_number])
-
-            df_output = df_output.append({
-                'boro': boro_hold,
-                'block': block_hold,
-                'lot': lot_hold,
-                'bin': bin_hold,
-                'address_string': street_string
-            }, ignore_index=True)
-
-            output_ctr += 1
-            bin_ctr = 0
-
-            # Now start rolling up addresses for the new BIN
-
-            boro_hold = row['boro']
-            block_hold = row['block']
-            lot_hold = row['lot']
-            bin_hold = row['bin']
-            stname_hold = row['stname']
-            no_street_number = []
-            street_numbers = []
-            addresses = []
-            street_string = ''
-            bin_ctr += 1
-
-            street_numbers, no_street_number = build_address_string(row, street_numbers, no_street_number)
-
-        else:
-
-            # BIN is the same. But if the street number has changed, format the old one by combining
-            # the street numbers with the name, and reinitialize the street numbers list.
-
-            if row['stname'] != stname_hold:
-
                 if len(street_numbers) > 0:
+                    if bin_ctr == 1:
+                        stname_hold = '({})'.format(stname_hold.strip())
                     addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
-                    street_numbers = []
 
+                if len(addresses) == 0 and len(no_street_number) == 1:
+                    no_street_number[0] = '({})'.format(no_street_number[0])
+
+                street_string = c2.join([*addresses, *no_street_number])
+
+                pad_output_writer.writerow([boro_hold, block_hold, lot_hold, bin_hold, street_string])
+
+                output_ctr += 1
+                bin_ctr = 0
+
+                # Now start rolling up addresses for the new BIN
+
+                boro_hold = row['boro']
+                block_hold = row['block']
+                lot_hold = row['lot']
+                bin_hold = row['bin']
                 stname_hold = row['stname']
+                no_street_number = []
+                street_numbers = []
+                addresses = []
+                street_string = ''
                 bin_ctr += 1
 
-            street_numbers, no_street_number = build_address_string(row, street_numbers, no_street_number)
+                street_numbers, no_street_number = build_address_string(row, street_numbers, no_street_number)
 
+            else:
 
-    # Process the last record
+                # BIN is the same. But if the street number has changed, format the old one by combining
+                # the street numbers with the name, and reinitialize the street numbers list.
 
-    if len(street_numbers) > 0:
-        if bin_ctr == 1:
-            stname_hold = '({})'.format(stname_hold.strip())
-        addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                if row['stname'] != stname_hold:
 
-    street_string = c2.join([*addresses, *no_street_number])
+                    if len(street_numbers) > 0:
+                        addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+                        street_numbers = []
 
-    df_output = df_output.append({
-        'boro': boro_hold,
-        'block': block_hold,
-        'lot': lot_hold,
-        'bin': bin_hold,
-        'address_string': street_string
-    }, ignore_index=True)
-    output_ctr += 1
+                    stname_hold = row['stname']
+                    bin_ctr += 1
 
-    # And dump the output to a CSV
-    df_output.to_csv (r'output/pad_output.csv', index=False, header=True)
+                street_numbers, no_street_number = build_address_string(row, street_numbers, no_street_number)
 
-    print('Records read and processed {}'.format(input_ctr))
-    print('Records written {}'.format(output_ctr))
+        # Process the last record
+
+        if len(street_numbers) > 0:
+            if bin_ctr == 1:
+                stname_hold = '({})'.format(stname_hold.strip())
+                addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
+
+        street_string = c2.join([*addresses, *no_street_number])
+
+        pad_output_writer.writerow([boro_hold, block_hold, lot_hold, bin_hold, street_string])
+        output_ctr += 1
+
+        print('Records read and processed {}'.format(input_ctr))
+        print('Records written {}'.format(output_ctr))
