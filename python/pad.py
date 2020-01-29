@@ -62,7 +62,8 @@ if __name__ == '__main__':
     # Open the output CSV, loop through the data and roll up addresses for each BIN
 
     with open('output/pad_output.csv', mode='w') as pad_output:
-        pad_output_writer = csv.writer(pad_output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        pad_output_writer = csv.writer(pad_output, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+        pad_output_writer.writerow(["boro", "block", "lot", "bin", "pad_addr"])
 
         for index, row in df.iterrows():
 

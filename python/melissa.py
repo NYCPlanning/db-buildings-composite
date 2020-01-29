@@ -67,7 +67,8 @@ if __name__ == '__main__':
     # Open the output CSV, loop through the data and roll up addresses for each BIN
 
     with open('output/melissa_output.csv', mode='w') as melissa_output:
-        melissa_output_writer = csv.writer(melissa_output, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        melissa_output_writer = csv.writer(melissa_output, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
+        melissa_output_writer.writerow(["boro", "block", "lot", "bin", "usps_addr"])
 
         for index, row in df.iterrows():
 
