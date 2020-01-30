@@ -87,11 +87,11 @@ if __name__ == '__main__':
         AND a.row_number = 1;
     '''
 
-    print('Creating BBL index on PLUTO')
+    print('Creating BBL index on PLUTO...')
     recipe_engine.execute(create_pluto_index_sql)
-    print('Creating MPLUTO_BBL index on footprints')
+    print('Creating MPLUTO_BBL index on footprints...')
     recipe_engine.execute(create_bf_index_sql)
-    print('Creating BIN index on footprints')
+    print('Creating BIN index on footprints...')
     recipe_engine.execute(create_bf_index_bin_sql)
 
     print('Getting footprints/PLUTO information...')
@@ -114,23 +114,33 @@ if __name__ == '__main__':
         print(df_melissa_zip.head())
 
     print('Getting PAD address strings...')
-    df_pad = pd.read_csv('output/pad_output.csv')
+    df_pad = pd.read_csv('output/pad_output.csv',
+        usecols=['bin', 'pad_addr'],
+        dtype={
+            'bin': 'str',
+            'pad_addr': 'str'
+        }
+    )
 
     if df_pad.empty:
         print('No records read from PAD')
         exit()
     else:
-        df_pad['bin'] = df_pad['bin'].astype(str)
         print(df_pad.head())
 
     print('Getting Melissa address strings...')
-    df_melissa = pd.read_csv('output/melissa_output.csv')
+    df_melissa = pd.read_csv('output/melissa_output.csv',
+        usecols=['bin', 'usps_addr'],
+        dtype={
+            'bin': 'str',
+            'usps_addr': 'str'
+        }
+    )
 
     if df_melissa.empty:
         print('No records read from Melissa')
         exit()
     else:
-        df_melissa['bin'] = df_melissa['bin'].astype(str)
         print(df_melissa.head())
 
     print('Getting OEM address strings...')
