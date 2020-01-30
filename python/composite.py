@@ -9,7 +9,7 @@ if __name__ == '__main__':
     # Connect to postgres db
     recipe_engine = create_engine(os.environ['RECIPE_ENGINE'])
     edm_data = create_engine(os.environ['EDM_DATA'])
-    engine = create_engine(os.environ['BUILD_ENGINE'])
+    #engine = create_engine(os.environ['BUILD_ENGINE'])
 
     # Join building footprints to PLUTO and return selected fields.
 
