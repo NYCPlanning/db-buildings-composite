@@ -11,8 +11,22 @@ if __name__ == '__main__':
     edm_data = create_engine(os.environ['EDM_DATA'])
     #engine = create_engine(os.environ['BUILD_ENGINE'])
 
-    # Join building footprints to PLUTO and return selected fields.
+    create_pluto_index_sql = '''
+        DROP INDEX IF EXISTS dcp_pluto.idx_pl_bbl;
+        CREATE INDEX idx_pl_bbl ON dcp_pluto."19v2" (bbl);
+    '''
 
+    create_bf_index_sql = '''
+        DROP INDEX IF EXISTS doitt_buildingfootprints.idx_bf_mpluto_bbl;
+        CREATE INDEX idx_bf_mpluto_bbl ON doitt_buildingfootprints."2019/11/29" (mpluto_bbl);
+    '''
+
+    create_bf_index_bin_sql = '''
+        DROP INDEX IF EXISTS doitt_buildingfootprints.idx_bf_bin;
+        CREATE INDEX idx_bf_bin ON doitt_buildingfootprints."2019/11/29" (bin);
+    '''
+
+    # Join building footprints to PLUTO and return selected fields.
     import_sql = '''SELECT f.mpluto_bbl AS bbl,
         f.mpluto_bbl AS bbl_text,
         f.bin AS bin,
@@ -49,7 +63,8 @@ if __name__ == '__main__':
         LEFT JOIN dcp_pluto.latest p
         ON f.mpluto_bbl = p.bbl
         WHERE f.bin NOT IN ('1000000', '2000000', '3000000', '4000000', '5000000')
-        AND f.mpluto_bbl IS NOT NULL;
+        AND f.mpluto_bbl IS NOT NULL
+        LIMIT 10000;
     '''
 
     melissa_sql = '''WITH _zips AS (
@@ -77,6 +92,13 @@ if __name__ == '__main__':
         WHERE a.bin = b.bin
         AND a.row_number = 1;
     '''
+
+    print('Creating BBL index on PLUTO')
+    recipe_engine.execute(create_pluto_index_sql)
+    print('Creating MPLUTO_BBL index on footprints')
+    recipe_engine.execute(create_bf_index_sql)
+    print('Creating BIN index on footprints')
+    recipe_engine.execute(create_bf_index_bin_sql)
 
     print('Getting footprints/PLUTO information...')
     df = pd.read_sql(import_sql, recipe_engine)
@@ -117,6 +139,25 @@ if __name__ == '__main__':
         df_melissa['bin'] = df_melissa['bin'].astype(str)
         print(df_melissa.head())
 
+    print('Getting OEM address strings...')
+    df_oem_bc = pd.read_csv('input/oem_bc.csv', 
+        usecols=['BIN', 'COMPLEX_TYPE', 'COMPLEX', 'OEM_NAME', 'ConstrType'],
+        dtype={
+            'BIN': 'str',
+            'COMPLEX_TYPE': 'str',
+            'COMPLEX': 'str',
+            'OEM_NAME': 'str',
+            'ConstrType': 'str'
+    })
+
+    if df_oem_bc.empty:
+        print('No records read from OEM Building Composite')
+        exit()
+    else:
+        print(df_oem_bc.head())
+
+    df['label'] = ''
+
     print('Merging footprints/PLUTO with PAD data...')
     with_pad = pd.merge(df,
             df_pad[['bin', 'pad_addr']],
@@ -150,17 +191,29 @@ if __name__ == '__main__':
 
     print(with_melissa_zip.head())
 
+    print('Merging footprints/PLUTO/PAD/Melissa data with OEM Buildings Composite info...')
+    df_final = pd.merge(with_melissa_zip,
+            df_oem_bc[['BIN', 'COMPLEX_TYPE', 'COMPLEX', 'OEM_NAME', 'ConstrType']],
+            right_on='BIN',
+            left_on='bin',
+            how='left')
+
+    del with_melissa_zip, df_oem_bc
+    gc.collect()
+
+    print(df_final.head())
+
     print('Setting label and initializing Nan values...')
-    with_melissa_zip = with_melissa_zip.replace(np.nan, '', regex=True)
-    with_melissa_zip.loc[with_melissa_zip['usps_addr'] == '', 'label'] = with_melissa_zip['pad_addr']
-    with_melissa_zip.loc[with_melissa_zip['label'] != with_melissa_zip['pad_addr'], 'label'] = with_melissa_zip['usps_addr']
+    #with_melissa_zip = with_melissa_zip.replace(np.nan, '', regex=True)
+    df_final.loc[df_final['usps_addr'].isnull(), 'label'] = df_final['pad_addr']
+    df_final.loc[df_final['label'] != df_final['pad_addr'], 'label'] = df_final['usps_addr']
 
     print('Dumping output to CSV...')
-    fieldnames = ['bbl', 'bbl_text', 'bin', 'doitt_id', 'cd', 'bldgclass', 'landuse',
-    'ownername', 'ownertype', 'numbldgs', 'numfloors', 'lotarea', 'unitsres', 'unitstotal',
-    'bsmtcode', 'proxcode', 'lottype', 'yearbuilt', 'yearalter1', 'yearalter2', 'borocode',
-    'height_roof', 'last_status_type', 'shape', 'complex_type', 'complex', 'oem_name', 'label',
-    'pad_addr', 'usps_addr', 'city', 'zip', 'multzip', 'mas_constrtype', 'bctcb',
-    'feature_code', 'ground_elevation']
-    df_reorder = with_melissa_zip[fieldnames] # rearrange column here
-    df_reorder.to_csv('output/buildings_composite.csv', index=False)
+    #fieldnames = ['bbl', 'bbl_text', 'bin', 'doitt_id', 'cd', 'bldgclass', 'landuse',
+    #'ownername', 'ownertype', 'numbldgs', 'numfloors', 'lotarea', 'unitsres', 'unitstotal',
+    #'bsmtcode', 'proxcode', 'lottype', 'yearbuilt', 'yearalter1', 'yearalter2', 'borocode',
+    #'height_roof', 'last_status_type', 'shape', 'complex_type', 'complex', 'oem_name', 'label',
+    #'pad_addr', 'usps_addr', 'city', 'zip', 'multzip', 'mas_constrtype', 'bctcb',
+    #'feature_code', 'ground_elevation']
+    #df_reorder = with_melissa_zip[fieldnames] # rearrange column here
+    df_final.to_csv('output/buildings_composite.csv', index=False)
