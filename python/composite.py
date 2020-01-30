@@ -28,7 +28,6 @@ if __name__ == '__main__':
 
     # Join building footprints to PLUTO and return selected fields.
     import_sql = '''SELECT f.mpluto_bbl AS bbl,
-        f.mpluto_bbl AS bbl_text,
         f.bin AS bin,
         f.doitt_id AS doitt_id,
         p.cd AS cd,
@@ -53,11 +52,6 @@ if __name__ == '__main__':
         p.borocode || p.ct2010 || p.cb2010 as bctcb,
         f.feat_code AS feature_code,
         f.groundelev AS ground_elevation,
-        '' as complex_type,
-        '' as complex,
-        '' as oem_name,
-        '' as label,
-        '' as mas_constrtype,
         ST_AsText(f.the_geom) AS shape
         FROM doitt_buildingfootprints.latest f
         LEFT JOIN dcp_pluto.latest p
@@ -203,8 +197,7 @@ if __name__ == '__main__':
 
     print(df_final.head())
 
-    print('Setting label and initializing Nan values...')
-    #with_melissa_zip = with_melissa_zip.replace(np.nan, '', regex=True)
+    print('Setting labels...')
     df_final.loc[df_final['usps_addr'].isnull(), 'label'] = df_final['pad_addr']
     df_final.loc[df_final['label'] != df_final['pad_addr'], 'label'] = df_final['usps_addr']
 
