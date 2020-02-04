@@ -57,8 +57,7 @@ if __name__ == '__main__':
         LEFT JOIN dcp_pluto.latest p
         ON f.mpluto_bbl = p.bbl
         WHERE f.bin NOT IN ('1000000', '2000000', '3000000', '4000000', '5000000')
-        AND f.mpluto_bbl IS NOT NULL
-        LIMIT 10000;
+        AND f.mpluto_bbl IS NOT NULL;
     '''
 
     melissa_sql = '''WITH _zips AS (
