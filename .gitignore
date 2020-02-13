@@ -2,3 +2,6 @@ input/
 output/
 python/pad_old.py
 .env
+*/.ipynb_checkpoints/*
+.ipynb_checkpoints
+*.ipynb
