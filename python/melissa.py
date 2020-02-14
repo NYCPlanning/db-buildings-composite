@@ -1,33 +1,14 @@
-from sqlalchemy import create_engine
+from helper.engines import recipe_engine, edm_engine, build_engine
+from helper.sort_addresses import hnum_sort_and_list, sort_and_list, apply_parallel
 import pandas as pd
+from multiprocessing import Pool, cpu_count
+import numpy as np
+import re
 import os
-import csv
 
-def build_address_string(row, street_numbers, no_street_number):
-    # lhnd and hhnd come in with extra spaces, hence the stripping
-    if row['hnum'] is None:
-        hnum = row['hnum']
-    else:
-        hnum = row['hnum'].strip()
-
-    stname = row['stname'].strip()
-
-    if hnum is None or len(hnum) == 0:
-        no_street_number.append(stname)
-    else:
-        street_numbers.append(hnum)
-
-    return street_numbers, no_street_number
-
-if __name__ == '__main__':
-    # Connect to postgres db
-    edm_engine = create_engine(os.environ['EDM_DATA'])
-    engine = create_engine(os.environ['BUILD_ENGINE'])
-
-    # Get the PAD records from the database. Filter out "million" BINs.
-    # Grouping because there are dups on this table.
-
-    import_sql = '''SELECT borough_code AS boro,
+def load_bin_chunk(bin):
+    # Get Melissa data from EDM for a unique, valid bin
+    import_sql = f'''SELECT borough_code AS boro,
         substring(bbl,2,5) AS block,
         substring(bbl,7,4) AS lot,
         bin,
@@ -35,19 +16,62 @@ if __name__ == '__main__':
         f1_normalized_sn AS stname
         FROM dcp_melissa."2019/09/25"
         WHERE f1_grc in ('00', '01')
-        AND bin NOT IN ('1000000', '2000000', '3000000', '4000000', '5000000')
-        AND borough_code BETWEEN '1' AND '5'
-        GROUP BY boro, block, lot, bin, f1_normalized_sn, f1_normalized_hn
-        ORDER BY boro, block, lot, bin, stname, hnum;'''
-
+        AND bin = '{bin}';'''
     df = pd.read_sql(import_sql, edm_engine)
+    df = df.replace([None], '')
 
-    if df.empty:
-        print('No records on Melissa table read')
-        exit()
-    else:
-        print(df.head())
+    # Strip extra spaces from house numbers
+    df['hnum'] = df['hnum'].str.strip()
+    df['stname'] = df['stname'].str.strip()
+    
+    return df
 
+def sort_single_bin(df):
+    # Create full address field
+    grouped = df.groupby(['boro','block','lot','bin','stname'])
+    print(len(df_by_street))
+    df_by_street = grouped.apply(hnum_sort_and_list)
+    df_by_street = df_by_street.reset_index()
+    df_by_street = df_by_street.rename(columns={0:'hnums'})
+    print(df_by_street.head())
+    df_by_street.loc[df_by_street['hnums'] != '', 'full_address'] = df_by_street['hnums'] + ' ' + df_by_street['stname']
+    df_by_street.loc[df_by_street['hnums'] == '', 'full_address'] = df_by_street['stname']
+
+    # Sort full addresses
+    df_by_bin = df_by_street.groupby(['boro','block','lot','bin']).apply(sort_and_list)
+    return df_by_bin
+
+def load_and_sort(bin):
+    raw_df = load_bin_chunk(bin)
+    sorted_df = sort_single_bin(raw_df)
+    return sorted_df
+
+
+if __name__ == '__main__':
+    # Import table of unique BIN-street combos
+    import_sql = '''SELECT DISTINCT bin
+        FROM dcp_melissa."2019/09/25"
+        WHERE f1_grc in ('00', '01')
+        AND bin NOT IN ('1000000', '2000000', '3000000', '4000000', '5000000')
+        AND borough_code BETWEEN '1' AND '5';'''
+    unique_df = pd.read_sql(import_sql, edm_engine)
+    unique_records = unique_df['bin'].tolist()
+    print("Loaded unique BINS: ", len(unique_records))
+
+    # Load and process BINs in parallel
+    print('Loading and sorting BINs...')
+    with Pool(processes=cpu_count()) as pool:
+        it = pool.map(load_and_sort, unique_records, 10000)
+
+    results_df = pd.DataFrame(it)
+    print(results_df.head())
+
+    results_df.to_csv('output/melissa_output.csv')
+
+
+
+
+    '''
     # Initialize work areas
 
     boro_hold = df['boro'].iloc[0]
@@ -143,3 +167,4 @@ if __name__ == '__main__':
 
         print('Records read and processed {}'.format(input_ctr))
         print('Records written {}'.format(output_ctr))
+'''
