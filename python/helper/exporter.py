@@ -1,11 +1,11 @@
-from .engines import edm_engine, qaqc_engine, psycopg2_connect
+from .engines import edm_engine, build_engine, psycopg2_connect
 from sqlalchemy.types import TEXT
 import io
 import psycopg2
 import logging
 import os
 
-def create_schema(output_table, DDL, con=qaqc_engine):
+def create_schema(output_table, DDL, con=build_engine):
     # Parse output table
     schema = output_table.split('.')[0]
     version = output_table.split('.')[1].replace('"', '')
@@ -28,19 +28,17 @@ def create_schema(output_table, DDL, con=qaqc_engine):
     '''
     con.connect().execute(create)
 
-def insert_to_table(results_dict, output_table, DDL, con=qaqc_engine):
-    columns = [i.strip('"') for i in DDL.keys()]
-    col_string = ','.join(columns)
-    var_col_string = ','.join(['%(' + col + ')s' for col in columns])
+def insert_to_table(results_dict, output_table, DDL, con=build_engine):
+    columns = ', '.join(str(x).replace('/', '_') for x in results_dict.keys())
+    values = ', '.join("'" + str(x).replace('/', '_') + "'" for x in results_dict.values())
+    sql = "INSERT INTO %s ( %s ) VALUES ( %s );" % (output_table, columns, values)
 
-    sql = f'''INSERT INTO {output_table}({col_string}) VALUES (%(first_name)s, %(last_name)s)'''
-    print(sql)
-    cur = con.cursor()
-    cur.executemany(f'''INSERT INTO {output_table}({col_string}) VALUES ({var_col_string})''', results_dict)
+    con.connect().execute(sql)
+    con.dispose()
 
 
 def exporter(df, output_table, DDL, 
-            con=qaqc_engine, sql='', sep=',', 
+            con=build_engine, sql='', sep=',', 
             geo_column='', SRID=4326):
     
     # Parse output table

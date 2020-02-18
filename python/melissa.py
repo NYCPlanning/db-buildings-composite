@@ -1,6 +1,6 @@
 from helper.engines import recipe_engine, edm_engine, build_engine
 from helper.sort_addresses import hnum_sort_and_list, sort_and_list
-from exporter import create_schema, insert_to_table
+from helper.exporter import create_schema, insert_to_table
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 from functools import partial
@@ -35,22 +35,17 @@ def sort_single_bin(df):
     df_by_street = df_by_street.rename(columns={0:'hnums'})
     df_by_street.loc[df_by_street['hnums'] != '', 'full_address'] = df_by_street['hnums'] + ' ' + df_by_street['stname']
     df_by_street.loc[df_by_street['hnums'] == '', 'full_address'] = df_by_street['stname']
-    
 
     # Sort full addresses
     df_by_bin = df_by_street.groupby(['boro','block','lot','bin']).apply(sort_and_list).reset_index()
     df_by_bin = df_by_bin.rename(columns={0:'usps_addr'})
-    print(df_by_bin.head())
     return df_by_bin
 
 def load_and_sort(bin, output_table, DDL, con=build_engine):
-    ##TODO: Figure out how to pass the non-iterable arguments to a pool map
     raw_df = load_bin_chunk(bin)
-    sorted_df = sort_single_bin(raw_df).to_dict('records')
+    sorted_df = sort_single_bin(raw_df)
     sorted_dict = sorted_df.to_dict('records')
-    insert_to_table(results_dict, output_table, DDL, con)
-    return sorted_df
-
+    insert_to_table(sorted_dict[0], output_table, DDL, con)
 
 if __name__ == '__main__':
     # Import table of unique BIN-street combos
@@ -63,20 +58,34 @@ if __name__ == '__main__':
     unique_records = unique_df['bin'].tolist()
     print("Loaded unique BINS: ", len(unique_records))
 
-    # Create output table
-    ##TODO: Code for setting up schema
-    create_schema()
+    # Create output table schema
+    output_table = "dcp_melissa_formatted.\"2020\""
+    DDL={"boro":"text",
+        "block":"text",
+        "lot":"text",
+        "bin":"text",
+        "usps_addr":"text"}
 
-    # Load and process BINs in parallel, then dump results to output table
+    create_schema(output_table, DDL, con=build_engine)
+
+    ##TODO: Replace redundant wrapper function with partial
+    def load_and_sort_wrapper(bin):
+        output_table = "dcp_melissa_formatted.\"2020\""
+        DDL={"boro":"text",
+        "block":"text",
+        "lot":"text",
+        "bin":"text",
+        "usps_addr":"text"}
+        load_and_sort(bin, output_table, DDL, con=build_engine)
+
+    # Load and process BINs in parallel, then dump results to build engine
     print('Loading and sorting BINs...')
     with Pool(processes=cpu_count()) as pool:
-        it = pool.map(partial(load_and_sort, 
+        ##TODO: Create partial function so that the parallel function only has 1 arg
+        func = partial(load_and_sort, 
             output_table=output_table, 
             con=edm_engine, 
-            DDL=DDL), unique_records, 10000)
+            DDL=DDL)
+        it = pool.map(load_and_sort_wrapper, unique_records, 10000)
 
-    results_df = pd.DataFrame(it)
-    print(results_df.head())
-
-    results_df.to_csv('output/melissa_output.csv')
 

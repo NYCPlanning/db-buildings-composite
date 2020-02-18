@@ -8,7 +8,7 @@ def apply_parallel(df_grouped, func):
 
 def hnum_sort_and_list(street_df):
     if street_df.shape[0] == 1:
-        return bin_df['hnum'][0]
+        return street_df['hnum'][0]
     else:
         # Sort number addresses, join, and append street name
         sorted_hnum = street_df.sort_values('hnum')
