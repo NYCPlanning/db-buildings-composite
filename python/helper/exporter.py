@@ -5,6 +5,40 @@ import psycopg2
 import logging
 import os
 
+def create_schema(output_table, DDL, con=qaqc_engine):
+    # Parse output table
+    schema = output_table.split('.')[0]
+    version = output_table.split('.')[1].replace('"', '')
+
+    # psycopg2 connections
+    db_connection = psycopg2_connect(con.url)
+    db_cursor = db_connection.cursor()
+    str_buffer = io.StringIO() 
+
+    columns = [i.strip('"') for i in DDL.keys()]
+    column_definitions = ','.join([f'"{key}" {value}' for key,value in DDL.items()])
+
+    # Create table
+    create = f'''
+    CREATE SCHEMA IF NOT EXISTS {schema};
+    DROP TABLE IF EXISTS {output_table};
+    CREATE TABLE {output_table} (
+        {column_definitions}
+    );
+    '''
+    con.connect().execute(create)
+
+def insert_to_table(results_dict, output_table, DDL, con=qaqc_engine):
+    columns = [i.strip('"') for i in DDL.keys()]
+    col_string = ','.join(columns)
+    var_col_string = ','.join(['%(' + col + ')s' for col in columns])
+
+    sql = f'''INSERT INTO {output_table}({col_string}) VALUES (%(first_name)s, %(last_name)s)'''
+    print(sql)
+    cur = con.cursor()
+    cur.executemany(f'''INSERT INTO {output_table}({col_string}) VALUES ({var_col_string})''', results_dict)
+
+
 def exporter(df, output_table, DDL, 
             con=qaqc_engine, sql='', sep=',', 
             geo_column='', SRID=4326):

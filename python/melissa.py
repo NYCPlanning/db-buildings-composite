@@ -1,7 +1,9 @@
 from helper.engines import recipe_engine, edm_engine, build_engine
-from helper.sort_addresses import hnum_sort_and_list, sort_and_list, apply_parallel
+from helper.sort_addresses import hnum_sort_and_list, sort_and_list
+from exporter import create_schema, insert_to_table
 import pandas as pd
 from multiprocessing import Pool, cpu_count
+from functools import partial
 import numpy as np
 import re
 import os
@@ -20,9 +22,10 @@ def load_bin_chunk(bin):
     df = pd.read_sql(import_sql, edm_engine)
     df = df.replace([None], '')
 
-    # Strip extra spaces from house numbers
+    # Strip extra spaces from house numbers & street names
     df['hnum'] = df['hnum'].str.strip()
     df['stname'] = df['stname'].str.strip()
+    df['stname'] = df['stname'].str.replace('\s+',' ', regex=True)
     
     return df
 
@@ -40,9 +43,12 @@ def sort_single_bin(df):
     print(df_by_bin.head())
     return df_by_bin
 
-def load_and_sort(bin):
+def load_and_sort(bin, output_table, DDL, con=build_engine):
+    ##TODO: Figure out how to pass the non-iterable arguments to a pool map
     raw_df = load_bin_chunk(bin)
-    sorted_df = sort_single_bin(raw_df)
+    sorted_df = sort_single_bin(raw_df).to_dict('records')
+    sorted_dict = sorted_df.to_dict('records')
+    insert_to_table(results_dict, output_table, DDL, con)
     return sorted_df
 
 
@@ -57,10 +63,17 @@ if __name__ == '__main__':
     unique_records = unique_df['bin'].tolist()
     print("Loaded unique BINS: ", len(unique_records))
 
-    # Load and process BINs in parallel
+    # Create output table
+    ##TODO: Code for setting up schema
+    create_schema()
+
+    # Load and process BINs in parallel, then dump results to output table
     print('Loading and sorting BINs...')
     with Pool(processes=cpu_count()) as pool:
-        it = pool.map(load_and_sort, unique_records, 10000)
+        it = pool.map(partial(load_and_sort, 
+            output_table=output_table, 
+            con=edm_engine, 
+            DDL=DDL), unique_records, 10000)
 
     results_df = pd.DataFrame(it)
     print(results_df.head())
