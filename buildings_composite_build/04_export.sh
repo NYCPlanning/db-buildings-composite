@@ -1,5 +1,10 @@
-DB_CONTAINER_NAME=bc
+#!/bin/bash
+source config.sh
 
-docker exec $DB_CONTAINER_NAME psql -h localhost -U postgres -c "\copy (SELECT * FROM pad_address_reformat)
-                                TO '/home/db-buildings-composite/output/pad_address_reformat.csv'
-                                DELIMITER ',' CSV HEADER;"
+START=$(date +%s);
+# Generate $(pwd)/output tables
+psql $BUILD_ENGINE -f sql/export.sql
+
+# -- export
+# --all records
+psql $BUILD_ENGINE -c "\copy (SELECT * FROM bc_export) TO '$(pwd)/output/bc.csv' DELIMITER ',' CSV HEADER;"
