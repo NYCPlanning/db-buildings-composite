@@ -7,6 +7,7 @@ from functools import partial
 import numpy as np
 import re
 import os
+import csv
 
 def load_bin_chunk(bin):
     # Get Melissa data from EDM for a unique, valid bin
@@ -70,6 +71,15 @@ if __name__ == '__main__':
 
     ##TODO: Replace redundant wrapper function with partial
     def load_and_sort_wrapper(bin):
+        output_table = "dcp_melissa_formatted.\"2020\""
+        DDL={"boro":"text",
+        "block":"text",
+        "lot":"text",
+        "bin":"text",
+        "usps_addr":"text"}
+        load_and_sort(bin, output_table, DDL, con=build_engine)
+
+    def sort_csv_dump(bin):
         output_table = "dcp_melissa_formatted.\"2020\""
         DDL={"boro":"text",
         "block":"text",
