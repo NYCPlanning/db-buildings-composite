@@ -1,0 +1,19 @@
+name: CI
+
+on: [push]
+
+jobs:
+  _01_dataloading:
+    container:
+      image: sptkl/cook:latest
+    runs-on: self-hosted
+    env:
+      RECIPE_ENGINE: ${{ secrets.RECIPE_ENGINE }}
+      BUILD_ENGINE: ${{ secrets.BUILD_ENGINE }}
+      EDM_DATA: ${{ secrets.EDM_DATA }}
+    steps:
+      - uses: actions/checkout@master
+      - name: dataloading ...
+        working-directory: buildings_composite_build
+        run: |
+          python3 python/dataloading.py
