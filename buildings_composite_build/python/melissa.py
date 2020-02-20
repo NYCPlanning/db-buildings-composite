@@ -1,10 +1,29 @@
 from helper.engines import recipe_engine, edm_engine, build_engine
-from helper.sort_addresses import hnum_sort_and_list, sort_and_list
 from helper.exporter import exporter
 import pandas as pd
 import numpy as np
 import re
 import os
+
+def hnum_sort_and_list(street_df):
+    # Sort number addresses, join, and append street name
+    sorted_hnum = street_df.sort_values('hnum')
+    hnum_list = sorted_hnum['hnum'].unique().tolist()
+    address_string = ','.join(hnum_list)
+    
+    return address_string
+
+def sort_and_list(bin_df):
+    # Temporarily modify street name field before alphabetizing
+    bin_df.loc[bin_df['hnums'] == '', 'stname'] = 'ZZZ' + bin_df['stname']
+    sorted_bin = bin_df.sort_values('stname')
+    
+    # Remove modifications and join
+    sorted_bin['stname'] = sorted_bin['stname'].str.replace('ZZZ','')
+    address_list = sorted_bin['full_address'].unique().tolist()
+    address_string = '::'.join(address_list)
+    
+    return address_string
 
 if __name__ == '__main__':
     # Import table of unique BIN-street combos

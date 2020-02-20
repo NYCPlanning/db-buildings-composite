@@ -79,15 +79,6 @@ if __name__ == '__main__':
         "usps_addr":"text"}
         load_and_sort(bin, output_table, DDL, con=build_engine)
 
-    def sort_csv_dump(bin):
-        output_table = "dcp_melissa_formatted.\"2020\""
-        DDL={"boro":"text",
-        "block":"text",
-        "lot":"text",
-        "bin":"text",
-        "usps_addr":"text"}
-        load_and_sort(bin, output_table, DDL, con=build_engine)
-
     # Load and process BINs in parallel, then dump results to build engine
     print('Loading and sorting BINs...')
     with Pool(processes=cpu_count()) as pool:
