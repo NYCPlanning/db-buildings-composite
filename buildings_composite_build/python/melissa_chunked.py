@@ -1,6 +1,6 @@
 from helper.engines import recipe_engine, edm_engine, build_engine
 from helper.sort_addresses import hnum_sort_and_list, sort_and_list
-from helper.exporter import create_schema, insert_to_table
+from helper.exporter import create_schema, insert_to_table, export_from_csv
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 from functools import partial
@@ -42,11 +42,13 @@ def sort_single_bin(df):
     df_by_bin = df_by_bin.rename(columns={0:'usps_addr'})
     return df_by_bin
 
-def load_and_sort(bin, output_table, DDL, con=build_engine):
+def load_and_sort(bin, csv_path):
     raw_df = load_bin_chunk(bin)
     sorted_df = sort_single_bin(raw_df)
     sorted_dict = sorted_df.to_dict('records')
-    insert_to_table(sorted_dict[0], output_table, DDL, con)
+    with open(csv_path, mode='w') as melissa_output:
+        w = csv.DictWriter(csv_path, field_names=sorted_dict[0].keys(), delimiter='$')
+        w.writerow(sorted_dict[0])
 
 if __name__ == '__main__':
     # Import table of unique BIN-street combos
@@ -60,7 +62,7 @@ if __name__ == '__main__':
     print("Loaded unique BINS: ", len(unique_records))
 
     # Create output table schema
-    output_table = "dcp_melissa_formatted.\"2020\""
+    output_table = "dcp_melissa_formatted.\"2020v2\""
     DDL={"boro":"text",
         "block":"text",
         "lot":"text",
@@ -69,24 +71,18 @@ if __name__ == '__main__':
 
     create_schema(output_table, DDL, con=build_engine)
 
-    ##TODO: Replace redundant wrapper function with partial
+    ##TODO: Replace wrapper function with partial
     def load_and_sort_wrapper(bin):
-        output_table = "dcp_melissa_formatted.\"2020\""
-        DDL={"boro":"text",
-        "block":"text",
-        "lot":"text",
-        "bin":"text",
-        "usps_addr":"text"}
-        load_and_sort(bin, output_table, DDL, con=build_engine)
+        csv_path = "output/melissa_output.csv"
+        load_and_sort(bin, csv_path)
 
-    # Load and process BINs in parallel, then dump results to build engine
+    # Load and process BINs in parallel, then dump results to csv
     print('Loading and sorting BINs...')
     with Pool(processes=cpu_count()) as pool:
         ##TODO: Create partial function so that the parallel function only has 1 arg
-        func = partial(load_and_sort, 
-            output_table=output_table, 
-            con=edm_engine, 
-            DDL=DDL)
         it = pool.map(load_and_sort_wrapper, unique_records, 10000)
 
-
+    # Copy from csv to build engine
+    print('Copying from CSV to build engine...')
+    export_from_csv('output/melissa_output.csv', output_table, DDL, con=build_engine,
+                    sep='$')

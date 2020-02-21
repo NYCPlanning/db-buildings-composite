@@ -82,8 +82,10 @@ if __name__ == '__main__':
             # Write the record for the last BIN to the output dataframe
 
                 if len(street_numbers) > 0:
-                    if bin_ctr == 1:
+                    if bin_ctr == 1 and len(street_numbers) == 1:
                         stname_hold = '({})'.format(stname_hold.strip())
+                    if bin_ctr == 1 and len(street_numbers) > 1:
+                        stname_hold = stname_hold.strip()
                     #addresses.append(c1.join(sorted(street_numbers)) + " " + stname_hold.strip())
                     addresses.append(c1.join(sorted(street_numbers)) + " " + " ".join(stname_hold.split()))
 
