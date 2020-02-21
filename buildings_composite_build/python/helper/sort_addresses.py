@@ -26,6 +26,8 @@ def sort_and_list(bin_df):
         
         # Remove modifications and join
         sorted_bin['stname'] = sorted_bin['stname'].str.replace('ZZZ','')
+        if sorted_bin.shape[0] == 1:
+            sorted_bin[~(sorted_bin['hnums'].str.contains(",")), 'stname'] = "(" + sorted_bin['stname'] + ")"
         address_list = sorted_bin['full_address'].unique().tolist()
         address_string = '::'.join(address_list)
         return address_string
