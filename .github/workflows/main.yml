@@ -1,0 +1,93 @@
+name: CI
+
+on: [push]
+
+jobs:
+  skip:
+    name: build?
+    runs-on: ubuntu-latest
+    if: "! contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - run: echo "${{ github.event.head_commit.message }}"
+  _01_dataloading:
+    name: dataloading ...
+    needs: skip
+    container:
+      image: sptkl/cook:latest
+    runs-on: ubuntu-latest
+    env:
+      RECIPE_ENGINE: ${{ secrets.RECIPE_ENGINE }}
+      BUILD_ENGINE: ${{ secrets.BUILD_ENGINE }}
+      EDM_DATA: ${{ secrets.EDM_DATA }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies ...
+        working-directory: buildings_composite_build
+        run: |
+          pip3 install -r python/requirements.txt
+      - name: Dataloading ...
+        working-directory: buildings_composite_build
+        run: |
+          python3 python/dataloading.py
+  _02_pad_addr:
+    name: pad addr
+    needs: _01_dataloading
+    container:
+      image: sptkl/cook:latest
+    runs-on: ubuntu-latest
+    env:
+      RECIPE_ENGINE: ${{ secrets.RECIPE_ENGINE }}
+      BUILD_ENGINE: ${{ secrets.BUILD_ENGINE }}
+      EDM_DATA: ${{ secrets.EDM_DATA }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies ...
+        working-directory: buildings_composite_build
+        run: |
+          pip3 install -r python/requirements.txt
+      - name: Formatting PAD data ...
+        working-directory: buildings_composite_build
+        run: |
+          python3 python/pad_ann.py
+  _02_usps_addr:
+    name: usps addr
+    needs: _01_dataloading
+    container:
+      image: sptkl/cook:latest
+    runs-on: ubuntu-latest
+    env:
+      RECIPE_ENGINE: ${{ secrets.RECIPE_ENGINE }}
+      BUILD_ENGINE: ${{ secrets.BUILD_ENGINE }}
+      EDM_DATA: ${{ secrets.EDM_DATA }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies ...
+        working-directory: buildings_composite_build
+        run: |
+          pip3 install -r python/requirements.txt
+      - name: Formatting Melissa data ...
+        working-directory: buildings_composite_build
+        run: |
+          python3 python/melissa_ann.py
+  _03_composite:
+    name: composite
+    needs: [_02_pad_addr, _02_usps_addr]
+    container:
+      image: mdillon/postgis:latest
+    runs-on: ubuntu-latest
+    env:
+      RECIPE_ENGINE: ${{ secrets.RECIPE_ENGINE }}
+      BUILD_ENGINE: ${{ secrets.BUILD_ENGINE }}
+      EDM_DATA: ${{ secrets.EDM_DATA }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Building composite dataset ...
+        working-directory: buildings_composite_build
+        run: |
+          psql $BUILD_ENGINE -f sql/create.sql
+          psql $BUILD_ENGINE -f sql/merge_pluto_footprints.sql
+          psql $BUILD_ENGINE -f sql/melissa_zips.sql
+          psql $BUILD_ENGINE -f sql/merge_pad_addr.sql
+          psql $BUILD_ENGINE -f sql/merge_usps_addr.sql
+          psql $BUILD_ENGINE -f sql/merge_oem.sql
+          psql $BUILD_ENGINE -f sql/set_labels.sql
